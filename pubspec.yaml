@@ -1,0 +1,23 @@
+name: ezmusicproduction_remote
+description: "EZMusicProduction Remote — control your studio from an Android phone or tablet."
+publish_to: "none"
+
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.7.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  shared_preferences: ^2.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true

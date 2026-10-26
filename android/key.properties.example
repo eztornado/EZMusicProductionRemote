@@ -1,0 +1,8 @@
+# Copy this file to android/key.properties and fill in your own values.
+#
+# Never commit key.properties or the keystore itself. Both are ignored by Git.
+# storeFile is resolved relative to android/app/.
+storeFile=../keystore/ez-remote-release.jks
+storePassword=replace-with-store-password
+keyAlias=ez-remote
+keyPassword=replace-with-key-password
