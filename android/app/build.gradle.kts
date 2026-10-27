@@ -17,7 +17,9 @@ if (hasReleaseSigning) {
 android {
     namespace = "com.ezmusicproduction.ezmusicproduction_remote"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // shared_preferences_android requires this NDK; it is backward compatible
+    // with plugins that target an older version.
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11

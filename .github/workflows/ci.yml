@@ -36,6 +36,8 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "ndk;27.0.12077973"
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: 3.29.3
