@@ -71,4 +71,4 @@ jobs:
             --title "$GITHUB_REF_NAME" \
             --notes "APK build of $GITHUB_SHA.
 
-          $note"
+          $note" || gh release upload "$GITHUB_REF_NAME" "$apk" --clobber
