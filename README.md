@@ -121,6 +121,17 @@ Keep the keystore and passwords in a secure backup. If a signing key is lost,
 you cannot publish updates for the same application ID. If it is exposed,
 rotate it and use a new application ID.
 
+### Tag releases
+
+Pushing a tag like `v26.11.01.02` runs the release workflow, which builds an
+APK and attaches it to a GitHub release for that tag. To publish
+release-signed APKs from CI, add four repository secrets:
+`ANDROID_KEYSTORE_BASE64` (the keystore file, base64 encoded with
+`base64 -i android/keystore/ez-remote-release.jks`), `ANDROID_KEYSTORE_PASSWORD`,
+`ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD`. Without them the workflow
+falls back to a debug-signed APK, which is clearly labelled as such in the
+release notes.
+
 ## Security notes
 
 - This client speaks the DAW's LAN protocol over `ws://`; TLS is intentionally
