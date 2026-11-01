@@ -138,7 +138,7 @@ class _RemoteAppState extends State<RemoteApp> with WidgetsBindingObserver {
       language: _language,
       onLanguageChanged: _setLanguage,
       child: MaterialApp(
-        title: 'EZ Remote',
+        title: 'EZMusicProductionRemote',
         debugShowCheckedModeBanner: false,
         scaffoldMessengerKey: _messengerKey,
         theme: buildAppTheme(),

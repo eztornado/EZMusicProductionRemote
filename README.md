@@ -1,4 +1,4 @@
-# EZ Remote
+# EZMusicProductionRemote
 
 A native Flutter Android remote for **EZMusicProduction**. It turns an Android
 phone or tablet into a transport, timeline, mixer, FX and automation surface for

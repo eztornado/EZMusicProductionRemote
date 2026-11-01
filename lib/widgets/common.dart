@@ -76,31 +76,35 @@ class ArtistName extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          'EZ',
-          style: TextStyle(
-            fontSize: compact ? 18 : 24,
-            height: 0.95,
-            fontWeight: FontWeight.w900,
-            letterSpacing: -1,
-            color: AppColors.text,
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerLeft,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'EZMusicProduction',
+            style: TextStyle(
+              fontSize: compact ? 15 : 21,
+              height: 0.95,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.8,
+              color: AppColors.text,
+            ),
           ),
-        ),
-        Text(
-          'REMOTE',
-          style: TextStyle(
-            fontSize: compact ? 8 : 10,
-            height: 1.1,
-            fontWeight: FontWeight.w700,
-            letterSpacing: compact ? 2.6 : 3.6,
-            color: AppColors.brandLight,
+          Text(
+            'REMOTE',
+            style: TextStyle(
+              fontSize: compact ? 8 : 10,
+              height: 1.1,
+              fontWeight: FontWeight.w700,
+              letterSpacing: compact ? 2.6 : 3.6,
+              color: AppColors.brandLight,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

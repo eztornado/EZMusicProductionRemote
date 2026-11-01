@@ -10,7 +10,7 @@ class AppSettings {
   const AppSettings({
     this.language = AppLanguage.system,
     this.autoReconnect = true,
-    this.clientName = 'EZ Remote',
+    this.clientName = 'EZMusicProductionRemote',
     this.devices = const <RemoteDevice>[],
   });
 
@@ -101,7 +101,7 @@ class SharedPreferencesSettingsStore implements SettingsStore {
       return AppSettings(
         language: language,
         autoReconnect: autoReconnect,
-        clientName: clientName.isEmpty ? 'EZ Remote' : clientName,
+        clientName: clientName.isEmpty ? 'EZMusicProductionRemote' : clientName,
         devices: devices,
       );
     } on Object {

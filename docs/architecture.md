@@ -2,7 +2,7 @@
 
 ## Goals
 
-EZ Remote is a thin, native client for the desktop DAW. The desktop app remains
+EZMusicProductionRemote is a thin, native client for the desktop DAW. The desktop app remains
 the source of truth; the phone is a low-latency control surface. That leads to a
 few deliberate choices:
 

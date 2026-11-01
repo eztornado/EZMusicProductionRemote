@@ -37,7 +37,7 @@ Future<void> main(List<String> args) async {
   final server = FakeRemoteServer(port: port, token: token);
 
   await server.start(host);
-  stdout.writeln('EZ Remote fake studio');
+  stdout.writeln('EZMusicProductionRemote fake studio');
   stdout.writeln('  pairing code: $token');
   stdout.writeln('  listen:       $host:$port');
   stdout.writeln('  discovery:    http://$host:$port/');

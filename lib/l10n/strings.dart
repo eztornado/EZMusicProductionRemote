@@ -77,7 +77,7 @@ class L10n {
   };
 
   static const Map<String, String> _en = {
-    'appName': 'EZ Remote',
+    'appName': 'EZMusicProductionRemote',
     'appTagline': 'Your studio, in your hands.',
     'cancel': 'Cancel',
     'close': 'Close',
@@ -418,7 +418,7 @@ class L10n {
   };
 
   static const Map<String, String> _es = {
-    'appName': 'EZ Remote',
+    'appName': 'EZMusicProductionRemote',
     'appTagline': 'Tu estudio, en tus manos.',
     'cancel': 'Cancelar',
     'close': 'Cerrar',
@@ -761,7 +761,7 @@ class L10n {
   };
 
   static const Map<String, String> _ja = {
-    'appName': 'EZ Remote',
+    'appName': 'EZMusicProductionRemote',
     'appTagline': 'スタジオを、手のひらに。',
     'cancel': 'キャンセル',
     'close': '閉じる',
