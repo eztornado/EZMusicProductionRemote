@@ -1,14 +1,13 @@
-import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
 import '../l10n/strings.dart';
 import '../models/project.dart';
-import '../models/session.dart';
 import '../state/remote_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
+import '../widgets/parameter_controls.dart';
 import 'sheets/master_fx_sheet.dart';
 import 'sheets/plugin_picker_sheet.dart';
 
@@ -142,7 +141,7 @@ class _FxScreenState extends State<FxScreen> {
                   ),
                 );
               }
-              return _FxParamEditor(
+              return _FxEditorPane(
                 key: ValueKey(
                   'fx-param-sheet-${liveTrack.id}-$slotKind-${liveTarget.slot.index}',
                 ),
@@ -182,7 +181,7 @@ class _FxScreenState extends State<FxScreen> {
                     title: l10n.t('noPluginSelected'),
                     message: l10n.t('selectEffectPrompt'),
                   )
-                  : _FxParamEditor(
+                  : _FxEditorPane(
                     key: ValueKey(
                       'fx-params-${track.id}-${target.kind}-${target.slot.index}',
                     ),
@@ -727,8 +726,11 @@ class _FxCard extends StatelessWidget {
   }
 }
 
-class _FxParamEditor extends StatefulWidget {
-  const _FxParamEditor({
+/// Header plus the shared parameter editor. The editor owns loading, presets
+/// and grouped pages; this pane keeps the chain-specific chrome (slot name,
+/// bypass and the reload affordance) on top.
+class _FxEditorPane extends StatefulWidget {
+  const _FxEditorPane({
     super.key,
     required this.controller,
     required this.track,
@@ -744,125 +746,15 @@ class _FxParamEditor extends StatefulWidget {
   final bool sheet;
 
   @override
-  State<_FxParamEditor> createState() => _FxParamEditorState();
+  State<_FxEditorPane> createState() => _FxEditorPaneState();
 }
 
-class _FxParamEditorState extends State<_FxParamEditor> {
-  final TextEditingController _search = TextEditingController();
-  final Map<int, double> _values = <int, double>{};
-  final Map<int, String> _texts = <int, String>{};
-  final Map<int, double> _pending = <int, double>{};
-  Timer? _flushTimer;
-  List<FxParam> _params = const <FxParam>[];
-  bool _loading = true;
-  String? _error;
-  String _query = '';
-
-  RemoteController get _controller => widget.controller;
-
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_load());
-  }
-
-  @override
-  void dispose() {
-    _flushTimer?.cancel();
-    _flush();
-    _search.dispose();
-    super.dispose();
-  }
-
-  Future<void> _load() async {
-    if (mounted) {
-      setState(() {
-        _loading = true;
-        _error = null;
-      });
-    }
-    try {
-      final params = await _controller.fetchFxParams(
-        trackId: widget.track.id,
-        slotKind: widget.slotKind,
-        slotIndex: widget.slot.index,
-      );
-      if (!mounted) return;
-      setState(() {
-        _params = params;
-        _values
-          ..clear()
-          ..addEntries(
-            params.map((param) => MapEntry(param.index, param.value)),
-          );
-        _texts
-          ..clear()
-          ..addEntries(
-            params.map((param) => MapEntry(param.index, param.text)),
-          );
-        _loading = false;
-      });
-    } on Object catch (raw) {
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _error = '$raw';
-      });
-    }
-  }
-
-  void _queue(int index, double value) {
-    _values[index] = value;
-    _pending[index] = value;
-    _flushTimer ??= Timer(const Duration(milliseconds: 65), _flush);
-  }
-
-  void _commit(int index, double value) {
-    _values[index] = value;
-    _pending[index] = value;
-    _flushTimer?.cancel();
-    _flushTimer = null;
-    _flush();
-  }
-
-  void _flush() {
-    if (_pending.isEmpty) return;
-    final batch = Map<int, double>.from(_pending);
-    _pending.clear();
-    for (final entry in batch.entries) {
-      unawaited(
-        _controller
-            .setFxParam(
-              trackId: widget.track.id,
-              slotKind: widget.slotKind,
-              slotIndex: widget.slot.index,
-              paramIndex: entry.key,
-              value: entry.value,
-            )
-            .then((param) {
-              if (param == null || !mounted) return;
-              setState(() {
-                _values[entry.key] = param.value;
-                _texts[entry.key] = param.text;
-              });
-            }),
-      );
-    }
-  }
-
-  List<FxParam> get _filtered {
-    if (_query.isEmpty) return _params;
-    final needle = _query.toLowerCase();
-    return _params
-        .where((param) => param.name.toLowerCase().contains(needle))
-        .toList(growable: false);
-  }
+class _FxEditorPaneState extends State<_FxEditorPane> {
+  int _refreshToken = 0;
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
     final color = AppColors.track(widget.track.colorIndex);
-    final filtered = _filtered;
     return Column(
       children: [
         _ParamHeader(
@@ -870,95 +762,25 @@ class _FxParamEditorState extends State<_FxParamEditor> {
           slot: widget.slot,
           slotKind: widget.slotKind,
           sheet: widget.sheet,
-          loading: _loading,
-          onReload: _load,
+          onReload: () => setState(() => _refreshToken++),
           onBypass:
-              () => _controller.setFxBypass(
+              () => widget.controller.setFxBypass(
                 widget.track.id,
                 widget.slot.index,
                 !widget.slot.bypass,
               ),
         ),
-        if (!_loading && _params.length > 5)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: TextField(
-              controller: _search,
-              onChanged: (value) => setState(() => _query = value.trim()),
-              decoration: InputDecoration(
-                hintText: l10n.t('searchParameters'),
-                prefixIcon: const Icon(Icons.search_rounded, size: 18),
-                suffixIcon:
-                    _query.isEmpty
-                        ? null
-                        : IconButton(
-                          onPressed: () {
-                            _search.clear();
-                            setState(() => _query = '');
-                          },
-                          icon: const Icon(Icons.close_rounded, size: 17),
-                        ),
-              ),
-            ),
-          ),
         Expanded(
-          child:
-              _loading
-                  ? const Center(
-                    child: SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2.2),
-                    ),
-                  )
-                  : _error != null
-                  ? EmptyState(
-                    icon: Icons.error_outline_rounded,
-                    title: l10n.t('error'),
-                    message: l10n.t('errorCommandFailed', {'error': _error!}),
-                    action: OutlinedButton.icon(
-                      onPressed: _load,
-                      icon: const Icon(Icons.refresh_rounded, size: 17),
-                      label: Text(l10n.t('retry')),
-                    ),
-                  )
-                  : _params.isEmpty
-                  ? EmptyState(
-                    icon: Icons.tune_rounded,
-                    title: l10n.t('noParameters'),
-                    message: l10n.t('noPluginSelected'),
-                    compact: true,
-                  )
-                  : filtered.isEmpty
-                  ? EmptyState(
-                    icon: Icons.search_off_rounded,
-                    title: l10n.t('pluginListEmpty'),
-                    message: l10n.t('searchParameters'),
-                    compact: true,
-                  )
-                  : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 2, 16, 24),
-                    itemCount: filtered.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 6),
-                    itemBuilder: (context, index) {
-                      final param = filtered[index];
-                      final value =
-                          (_values[param.index] ?? param.value)
-                              .clamp(0.0, 1.0)
-                              .toDouble();
-                      final text = _texts[param.index] ?? '';
-                      return _ParamRow(
-                        param: param,
-                        value: value,
-                        text: text.isEmpty ? '${(value * 100).round()}%' : text,
-                        color: color,
-                        bypass: widget.slot.bypass,
-                        onChanged:
-                            (next) => setState(() => _queue(param.index, next)),
-                        onChangeEnd: (next) => _commit(param.index, next),
-                      );
-                    },
-                  ),
+          child: FxParameterView(
+            controller: widget.controller,
+            trackId: widget.track.id,
+            slotKind: widget.slotKind,
+            slotIndex: widget.slot.index,
+            color: color,
+            bypass: widget.slot.bypass,
+            compact: widget.sheet,
+            refreshToken: _refreshToken,
+          ),
         ),
       ],
     );
@@ -971,7 +793,6 @@ class _ParamHeader extends StatelessWidget {
     required this.slot,
     required this.slotKind,
     required this.sheet,
-    required this.loading,
     required this.onReload,
     required this.onBypass,
   });
@@ -980,7 +801,6 @@ class _ParamHeader extends StatelessWidget {
   final FxSlot slot;
   final int slotKind;
   final bool sheet;
-  final bool loading;
   final VoidCallback onReload;
   final VoidCallback onBypass;
 
@@ -1033,22 +853,12 @@ class _ParamHeader extends StatelessWidget {
               ],
             ),
           ),
-          if (loading)
-            const Padding(
-              padding: EdgeInsets.all(10),
-              child: SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 1.8),
-              ),
-            )
-          else
-            IconButton(
-              tooltip: l10n.t('reloadPlugins'),
-              onPressed: onReload,
-              icon: const Icon(Icons.refresh_rounded, size: 18),
-              visualDensity: VisualDensity.compact,
-            ),
+          IconButton(
+            tooltip: l10n.t('reloadPlugins'),
+            onPressed: onReload,
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            visualDensity: VisualDensity.compact,
+          ),
           if (slotKind == 0)
             ToggleTag(
               label: 'B',
@@ -1067,92 +877,6 @@ class _ParamHeader extends StatelessWidget {
               visualDensity: VisualDensity.compact,
             ),
         ],
-      ),
-    );
-  }
-}
-
-class _ParamRow extends StatelessWidget {
-  const _ParamRow({
-    required this.param,
-    required this.value,
-    required this.text,
-    required this.color,
-    required this.bypass,
-    required this.onChanged,
-    required this.onChangeEnd,
-  });
-
-  final FxParam param;
-  final double value;
-  final String text;
-  final Color color;
-  final bool bypass;
-  final ValueChanged<double> onChanged;
-  final ValueChanged<double> onChangeEnd;
-
-  @override
-  Widget build(BuildContext context) {
-    return Opacity(
-      opacity: bypass ? 0.62 : 1,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 5),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    param.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.text,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 140),
-                  child: Text(
-                    text,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.right,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: color,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            SliderTheme(
-              data: SliderTheme.of(context).copyWith(
-                activeTrackColor: color,
-                thumbColor: AppColors.text,
-                overlayColor: color.withValues(alpha: 0.14),
-                trackHeight: 3,
-              ),
-              child: Slider(
-                value: value,
-                min: 0,
-                max: 1,
-                onChanged: onChanged,
-                onChangeEnd: onChangeEnd,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

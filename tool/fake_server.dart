@@ -74,6 +74,10 @@ class FakeRemoteServer {
   final List<_FakeClient> _clients = <_FakeClient>[];
   final Map<String, List<Map<String, Object?>>> _fxParams =
       <String, List<Map<String, Object?>>>{};
+  final Map<String, List<Map<String, Object?>>> _masterFxParams =
+      <String, List<Map<String, Object?>>>{};
+  final Map<String, List<String>> _fxPrograms = <String, List<String>>{};
+  final Map<String, int> _fxCurrentProgram = <String, int>{};
   final List<Map<String, Object?>> _plugins = <Map<String, Object?>>[
     _plugin(0, 'Compressor', false, 'VST3'),
     _plugin(1, 'Chorus', false, 'VST3'),
@@ -83,6 +87,7 @@ class FakeRemoteServer {
     _plugin(5, 'Analog Lab V', true, 'VST3'),
     _plugin(6, 'Studio Piano', true, 'VST3'),
     _plugin(7, 'Tape Echo', false, 'VST3'),
+    _plugin(8, 'EZSynth 2', true, 'VST3'),
   ];
 
   final List<_FakeTrack> _tracks = <_FakeTrack>[];
@@ -150,6 +155,11 @@ class FakeRemoteServer {
 
   void _seedProject() {
     _masterFx.add(_fxSlot(0, 'Limiter'));
+    _masterFxParams['master:0'] = _params(<String>[
+      'Gain',
+      'Ceiling',
+      'Release',
+    ]);
 
     final drums = _addTrackInternal(
       name: 'Drums',
@@ -260,6 +270,39 @@ class FakeRemoteServer {
       ),
     );
 
+    final lead = _addTrackInternal(
+      name: 'Lead',
+      type: 'instrument',
+      colorIndex: 3,
+      volume: 0.65,
+      pan: -0.2,
+      instrument: 'EZSynth 2',
+    );
+    _fxParams['${lead.id}:1:0'] = _ezsynthParams();
+    _fxPrograms['${lead.id}:1:0'] = <String>[
+      'Init | EZSynth Init',
+      'Bass | Sub Bass',
+      'Bass | Reese Wide',
+      'Lead | Neon Lead',
+      'Pad | Glass Pad',
+      'Keys | Electric Keys',
+      'Pluck | Crystal Pluck',
+    ];
+    _fxCurrentProgram['${lead.id}:1:0'] = 3;
+    lead.clips.add(
+      _newClip(
+        kind: 'midi',
+        start: 8,
+        length: 16,
+        offset: 0,
+        notes: <Map<String, Object?>>[
+          _note(72, 0.85, 0, 0.5),
+          _note(75, 0.7, 1, 0.5),
+          _note(79, 0.8, 2, 1),
+        ],
+      ),
+    );
+
     final vocal = _addTrackInternal(
       name: 'Vocal',
       type: 'audio',
@@ -343,13 +386,174 @@ class FakeRemoteServer {
   List<Map<String, Object?>> _params(List<String> names) {
     return <Map<String, Object?>>[
       for (var index = 0; index < names.length; index++)
-        <String, Object?>{
-          'index': index,
-          'name': names[index],
-          'value': 0.5,
-          'text': '50%',
-        },
+        _param(index, 'param$index', names[index]),
     ];
+  }
+
+  /// One `fx.params` entry. Rich metadata is optional in the protocol; the
+  /// generic effects keep only name/value/text while EZSynth publishes groups,
+  /// switches, choices and defaults.
+  Map<String, Object?> _param(
+    int index,
+    String id,
+    String name, {
+    String group = '',
+    double value = 0.5,
+    String? text,
+    int flags = 0,
+    double? defaultValue,
+    int steps = 0,
+    List<String>? choices,
+  }) {
+    final choiceIndex =
+        steps <= 1 ? 0 : (value * (steps - 1)).round().clamp(0, steps - 1);
+    final resolvedText =
+        text ??
+        (choices != null && choices.isNotEmpty
+            ? choices[choiceIndex.clamp(0, choices.length - 1)]
+            : (flags & 1) != 0
+            ? (value >= 0.5 ? 'On' : 'Off')
+            : '${(value * 100).round()}%');
+    return <String, Object?>{
+      'index': index,
+      'id': id,
+      'name': name,
+      'value': value,
+      'text': resolvedText,
+      'group': group,
+      'flags': flags,
+      'default': defaultValue ?? value,
+      'steps': steps,
+      if (choices != null) 'choices': choices,
+    };
+  }
+
+  List<Map<String, Object?>> _ezsynthParams() {
+    final out = <Map<String, Object?>>[];
+    void add(
+      String id,
+      String name, {
+      String group = 'global',
+      double value = 0.5,
+      String? text,
+      int flags = 0,
+      double? defaultValue,
+      int steps = 0,
+      List<String>? choices,
+    }) {
+      out.add(
+        _param(
+          out.length,
+          id,
+          name,
+          group: group,
+          value: value,
+          text: text,
+          flags: flags,
+          defaultValue: defaultValue,
+          steps: steps,
+          choices: choices,
+        ),
+      );
+    }
+
+    add('tune', 'Master Tune', value: 0.5, text: '0 st', flags: 4, steps: 25);
+    add('polyphony', 'Polyphony', value: 0.5, flags: 4, steps: 17);
+    add('a_level', 'Layer A Level', group: 'a', value: 0.7);
+    add('a_pan', 'Layer A Pan', group: 'a', value: 0.5);
+    add('a_detune', 'Layer A Detune', group: 'a', value: 0.18);
+    add(
+      'a_wave',
+      'Layer A Wave',
+      group: 'a',
+      value: 0.5,
+      flags: 2,
+      steps: 4,
+      choices: <String>['Saw', 'Square', 'Triangle', 'Sine'],
+    );
+    add('b_level', 'Layer B Level', group: 'b', value: 0.35);
+    add('b_pan', 'Layer B Pan', group: 'b', value: 0.55);
+    add(
+      'b_wave',
+      'Layer B Wave',
+      group: 'b',
+      value: 0.25,
+      flags: 2,
+      steps: 4,
+      choices: <String>['Saw', 'Square', 'Triangle', 'Sine'],
+    );
+    add('noise', 'Noise', group: 'x', value: 0.08);
+    add('morph', 'Morph', group: 'x', value: 0.5);
+    add('f1_cutoff', 'Filter 1 Cutoff', group: 'f1', value: 0.42);
+    add('f1_reso', 'Filter 1 Resonance', group: 'f1', value: 0.22);
+    add(
+      'f1_type',
+      'Filter 1 Type',
+      group: 'f1',
+      value: 0.0,
+      flags: 2,
+      steps: 3,
+      choices: <String>['Low-pass', 'Band-pass', 'High-pass'],
+    );
+    add('f2_cutoff', 'Filter 2 Cutoff', group: 'f2', value: 0.6);
+    add('f2_reso', 'Filter 2 Resonance', group: 'f2', value: 0.15);
+    add('e1_attack', 'Amp Attack', group: 'e1', value: 0.05);
+    add('e1_decay', 'Amp Decay', group: 'e1', value: 0.4);
+    add('e1_sustain', 'Amp Sustain', group: 'e1', value: 0.8);
+    add('e1_release', 'Amp Release', group: 'e1', value: 0.3);
+    add('e2_attack', 'Filter Attack', group: 'e2', value: 0.1);
+    add('e2_decay', 'Filter Decay', group: 'e2', value: 0.35);
+    add('e2_sustain', 'Filter Sustain', group: 'e2', value: 0.5);
+    add('e2_release', 'Filter Release', group: 'e2', value: 0.25);
+    add('l1_rate', 'LFO 1 Rate', group: 'l1', value: 0.3);
+    add('l1_depth', 'LFO 1 Depth', group: 'l1', value: 0.2);
+    add(
+      'l1_sync',
+      'LFO 1 Sync',
+      group: 'l1',
+      value: 1,
+      flags: 1,
+      defaultValue: 1,
+    );
+    add('l2_rate', 'LFO 2 Rate', group: 'l2', value: 0.55);
+    add('mac1', 'Macro 1', group: 'macro', value: 0.5);
+    add('mac2', 'Macro 2', group: 'macro', value: 0.5);
+    add('mac3', 'Macro 3', group: 'macro', value: 0.5);
+    add('mac4', 'Macro 4', group: 'macro', value: 0.5);
+    add('fx_drive', 'Rack Drive', group: 'fx', value: 0.2);
+    add('fx_chorus', 'Rack Chorus', group: 'fx', value: 0.3);
+    add('fx_reverb', 'Rack Reverb', group: 'fx', value: 0.4);
+    add(
+      'arp_mode',
+      'Arp Mode',
+      group: 'arp',
+      value: 0.0,
+      flags: 2,
+      steps: 4,
+      choices: <String>['Off', 'Up', 'Down', 'Random'],
+    );
+    add(
+      'arp_division',
+      'Arp Division',
+      group: 'arp',
+      value: 0.33,
+      flags: 2,
+      steps: 4,
+      choices: <String>['1/4', '1/8', '1/16', '1/32'],
+    );
+    add('arp_latch', 'Arp Latch', group: 'arp', value: 0, flags: 1);
+    add(
+      'mpe_bend',
+      'MPE Bend Range',
+      group: 'mpe',
+      value: 0.5,
+      flags: 4,
+      steps: 25,
+    );
+    add('mpe_slide', 'MPE Slide', group: 'mpe', value: 0.5);
+    add('line1', 'Motion Line 1', group: 'lines', value: 0.5);
+    add('line2', 'Motion Line 2', group: 'lines', value: 0.5);
+    return out;
   }
 
   // ---------------------------------------------------------------------------
@@ -511,6 +715,8 @@ class FakeRemoteServer {
           'automation',
           'meters',
           'plugins',
+          'pluginParams',
+          'programs',
         ],
       },
       'state': _projectJson(),
@@ -695,6 +901,8 @@ class FakeRemoteServer {
         _sendResult(client, id, _fxParamsFor(message));
       case 'fx.setParam':
         _sendResult(client, id, _fxSetParam(message));
+      case 'fx.setProgram':
+        _sendResult(client, id, _fxSetProgram(message));
       case 'fx.setBypass':
         _fxSetBypass(message);
         _touch();
@@ -899,36 +1107,55 @@ class FakeRemoteServer {
   // FX
   // ---------------------------------------------------------------------------
 
-  Map<String, Object?> _fxParamsFor(Map<String, Object?> message) {
-    final track = _track(_int(message['trackId']));
-    final slotKind = _int(message['slotKind']);
-    final slotIndex = _int(message['slotIndex']);
-    final key = '${track.id}:$slotKind:$slotIndex';
-    var params = _fxParams[key];
-    if (params == null) {
-      params = _params(<String>['Drive', 'Tone', 'Mix']);
-      _fxParams[key] = params;
+  ({String key, List<Map<String, Object?>> params}) _fxSlotParams(
+    int trackId,
+    int slotKind,
+    int slotIndex,
+  ) {
+    if (slotKind == 2) {
+      final key = 'master:$slotIndex';
+      final params = _masterFxParams.putIfAbsent(
+        key,
+        () => _params(<String>['Drive', 'Tone', 'Mix']),
+      );
+      return (key: key, params: params);
     }
-    return <String, Object?>{
-      'slotKind': slotKind,
-      'slotIndex': slotIndex,
-      'params': params,
-    };
-  }
-
-  Map<String, Object?> _fxSetParam(Map<String, Object?> message) {
-    final track = _track(_int(message['trackId']));
-    final slotKind = _int(message['slotKind']);
-    final slotIndex = _int(message['slotIndex']);
+    final track = _track(trackId);
     final key = '${track.id}:$slotKind:$slotIndex';
     final params = _fxParams.putIfAbsent(
       key,
       () => _params(<String>['Drive', 'Tone', 'Mix']),
     );
+    return (key: key, params: params);
+  }
+
+  Map<String, Object?> _fxParamsFor(Map<String, Object?> message) {
+    final slotKind = _int(message['slotKind']);
+    final slotIndex = _int(message['slotIndex']);
+    final slot = _fxSlotParams(_int(message['trackId']), slotKind, slotIndex);
+    final result = <String, Object?>{
+      'slotKind': slotKind,
+      'slotIndex': slotIndex,
+      'params': slot.params,
+    };
+    final programs = _fxPrograms[slot.key];
+    if (programs != null && programs.isNotEmpty) {
+      result['programs'] = programs;
+      result['currentProgram'] = _fxCurrentProgram[slot.key] ?? 0;
+    }
+    return result;
+  }
+
+  Map<String, Object?> _fxSetParam(Map<String, Object?> message) {
+    final slot = _fxSlotParams(
+      _int(message['trackId']),
+      _int(message['slotKind']),
+      _int(message['slotIndex']),
+    );
     final index = _int(message['paramIndex']);
     final value = _double(message['value']).clamp(0.0, 1.0);
     Map<String, Object?>? param;
-    for (final candidate in params) {
+    for (final candidate in slot.params) {
       if (candidate['index'] == index) {
         param = candidate;
         break;
@@ -938,8 +1165,38 @@ class FakeRemoteServer {
       throw _ProtocolError('not_found', 'parameter not found: $index');
     }
     param['value'] = value;
-    param['text'] = '${(value * 100).round()}%';
+    final steps = _int(param['steps']);
+    final choices = param['choices'];
+    final flags = _int(param['flags']);
+    if (choices is List && steps > 1) {
+      final choice = (value * (steps - 1)).round().clamp(0, choices.length - 1);
+      param['text'] = '${choices[choice]}';
+    } else if ((flags & 1) != 0) {
+      param['text'] = value >= 0.5 ? 'On' : 'Off';
+    } else {
+      param['text'] = '${(value * 100).round()}%';
+    }
     return <String, Object?>{'value': value, 'text': param['text']};
+  }
+
+  Map<String, Object?> _fxSetProgram(Map<String, Object?> message) {
+    final slot = _fxSlotParams(
+      _int(message['trackId']),
+      _int(message['slotKind']),
+      _int(message['slotIndex']),
+    );
+    final programs = _fxPrograms[slot.key];
+    final programIndex = _int(message['programIndex'], fallback: -1);
+    if (programs == null ||
+        programIndex < 0 ||
+        programIndex >= programs.length) {
+      throw _ProtocolError('not_found', 'program not found: $programIndex');
+    }
+    _fxCurrentProgram[slot.key] = programIndex;
+    return <String, Object?>{
+      'program': programIndex,
+      'name': programs[programIndex],
+    };
   }
 
   void _fxSetBypass(Map<String, Object?> message) {

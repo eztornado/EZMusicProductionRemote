@@ -10,6 +10,8 @@ import '../state/remote_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
 
+enum _SettingsSection { connection, interface, security, about }
+
 Future<void> showSettingsSheet(
   BuildContext context, {
   required RemoteController controller,
@@ -18,7 +20,7 @@ Future<void> showSettingsSheet(
 }) {
   return showAppSheet<void>(
     context,
-    maxWidth: 640,
+    maxWidth: 760,
     heightFactor: 0.92,
     builder:
         (ctx) => _SettingsSheet(
@@ -49,6 +51,7 @@ class _SettingsSheetState extends State<_SettingsSheet> {
     text: widget.controller.settings.clientName,
   );
   late final FocusNode _clientFocus = FocusNode();
+  _SettingsSection _section = _SettingsSection.connection;
 
   @override
   void initState() {
@@ -103,192 +106,516 @@ class _SettingsSheetState extends State<_SettingsSheet> {
     if (mounted) Navigator.of(context).pop();
   }
 
+  String _sectionLabel(L10n l10n, _SettingsSection section) =>
+      switch (section) {
+        _SettingsSection.connection => l10n.t('connectionSection'),
+        _SettingsSection.interface => l10n.t('interfaceSection'),
+        _SettingsSection.security => l10n.t('securitySection'),
+        _SettingsSection.about => l10n.t('aboutSection'),
+      };
+
+  IconData _sectionIcon(_SettingsSection section) => switch (section) {
+    _SettingsSection.connection => Icons.lan_outlined,
+    _SettingsSection.interface => Icons.palette_outlined,
+    _SettingsSection.security => Icons.shield_outlined,
+    _SettingsSection.about => Icons.info_outline_rounded,
+  };
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     return ValueListenableBuilder<AppSettings>(
       valueListenable: widget.controller.preferences,
       builder: (context, settings, _) {
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 26),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SheetHeader(
               title: l10n.t('settingsTitle'),
               subtitle: l10n.t('workspaceSettings'),
               icon: Icons.settings_rounded,
+              padding: const EdgeInsets.fromLTRB(20, 4, 12, 10),
             ),
-            _SettingsCard(
-              title: l10n.t('connectionSection'),
-              icon: Icons.lan_outlined,
-              children: [
-                TextField(
-                  controller: _clientName,
-                  focusNode: _clientFocus,
-                  textInputAction: TextInputAction.done,
-                  onSubmitted: (_) => _saveClientName(),
-                  decoration: InputDecoration(
-                    labelText: l10n.t('clientName'),
-                    helperText: l10n.t('clientNameHint'),
-                    prefixIcon: const Icon(
-                      Icons.phone_android_rounded,
-                      size: 18,
-                    ),
-                    suffixIcon: IconButton(
-                      tooltip: l10n.t('done'),
-                      icon: const Icon(Icons.check_rounded, size: 18),
-                      onPressed: () {
-                        _saveClientName();
-                        _clientFocus.unfocus();
-                      },
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _SwitchRow(
-                  title: l10n.t('autoReconnect'),
-                  subtitle: l10n.t('autoReconnectHint'),
-                  value: settings.autoReconnect,
-                  onChanged:
-                      (value) => widget.controller.setAutoReconnect(value),
-                ),
-                const Divider(height: 24),
-                _ConnectionDetails(controller: widget.controller),
-              ],
-            ),
-            const SizedBox(height: 14),
-            _SettingsCard(
-              title: l10n.t('languageSection'),
-              icon: Icons.translate_rounded,
-              children: [
-                for (final language in AppLanguage.values)
-                  _LanguageTile(
-                    language: language,
-                    selected: settings.language == language,
-                    onTap: () {
-                      widget.onLanguageChanged(language);
-                    },
-                  ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            _SettingsCard(
-              title: l10n.t('securitySection'),
-              icon: Icons.shield_outlined,
-              children: [
-                Text(
-                  l10n.t('securityBody'),
-                  style: const TextStyle(
-                    fontSize: 11.5,
-                    height: 1.5,
-                    color: AppColors.textDim,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                StatusPill(
-                  label: l10n.t('securityWarning'),
-                  color: AppColors.warning,
-                  icon: Icons.lan_outlined,
-                  dense: true,
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _disconnect,
-                        icon: const Icon(Icons.link_off_rounded, size: 17),
-                        label: Text(l10n.t('disconnect')),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.danger,
-                          side: BorderSide(
-                            color: AppColors.danger.withValues(alpha: 0.5),
-                          ),
-                        ),
-                        onPressed: _forget,
-                        icon: const Icon(
-                          Icons.delete_outline_rounded,
-                          size: 17,
-                        ),
-                        label: Text(l10n.t('forgetPairing')),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            _SettingsCard(
-              title: l10n.t('aboutSection'),
-              icon: Icons.info_outline_rounded,
-              children: [
-                Row(
-                  children: [
-                    const BrandMark(size: 46),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final wide = constraints.maxWidth >= 600;
+                  if (!wide) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text(
-                          l10n.t('appName'),
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.text,
-                          ),
+                        _SectionChips(
+                          selected: _section,
+                          labelFor: (section) => _sectionLabel(l10n, section),
+                          iconFor: _sectionIcon,
+                          onSelected:
+                              (section) => setState(() => _section = section),
                         ),
-                        Text(
-                          l10n.t('appVersion', {'version': kAppVersion}),
-                          style: const TextStyle(
-                            fontSize: 10.5,
-                            color: AppColors.textFaint,
-                          ),
-                        ),
+                        const Divider(height: 1),
+                        Expanded(child: _panel(settings, wide: false)),
                       ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  l10n.t('aboutBody'),
-                  style: const TextStyle(
-                    fontSize: 11.5,
-                    height: 1.5,
-                    color: AppColors.textDim,
-                  ),
-                ),
-                const Divider(height: 24),
-                InfoRow(
-                  label: l10n.t('protocolVersion', {'version': ''}).trim(),
-                  value: '$kRemoteProtocolVersion',
-                  icon: Icons.api_rounded,
-                ),
-                InfoRow(
-                  label: l10n.t('madeBy'),
-                  value: 'EZMusicProduction',
-                  icon: Icons.favorite_outline_rounded,
-                ),
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed:
-                      () => showLicensePage(
-                        context: context,
-                        applicationName: l10n.t('appName'),
-                        applicationVersion: kAppVersion,
+                    );
+                  }
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SizedBox(
+                        width: 196,
+                        child: _SectionRail(
+                          selected: _section,
+                          labelFor: (section) => _sectionLabel(l10n, section),
+                          iconFor: _sectionIcon,
+                          onSelected:
+                              (section) => setState(() => _section = section),
+                        ),
                       ),
-                  icon: const Icon(Icons.description_outlined, size: 17),
-                  label: Text(l10n.t('licences')),
-                ),
-              ],
+                      const VerticalDivider(width: 1),
+                      Expanded(child: _panel(settings, wide: true)),
+                    ],
+                  );
+                },
+              ),
             ),
           ],
         );
       },
+    );
+  }
+
+  Widget _panel(AppSettings settings, {required bool wide}) {
+    final content = switch (_section) {
+      _SettingsSection.connection => _ConnectionPanel(
+        controller: widget.controller,
+        settings: settings,
+        clientName: _clientName,
+        clientFocus: _clientFocus,
+        onSaveClientName: _saveClientName,
+      ),
+      _SettingsSection.interface => _InterfacePanel(
+        settings: settings,
+        onLanguageChanged: widget.onLanguageChanged,
+      ),
+      _SettingsSection.security => _SecurityPanel(
+        onDisconnect: _disconnect,
+        onForget: _forget,
+      ),
+      _SettingsSection.about => _AboutPanel(),
+    };
+    return ListView(
+      key: PageStorageKey<String>('settings-${_section.name}'),
+      padding: EdgeInsets.fromLTRB(wide ? 20 : 16, 14, wide ? 20 : 16, 26),
+      children: [content],
+    );
+  }
+}
+
+class _SectionRail extends StatelessWidget {
+  const _SectionRail({
+    required this.selected,
+    required this.labelFor,
+    required this.iconFor,
+    required this.onSelected,
+  });
+
+  final _SettingsSection selected;
+  final String Function(_SettingsSection section) labelFor;
+  final IconData Function(_SettingsSection section) iconFor;
+  final ValueChanged<_SettingsSection> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(10, 12, 10, 18),
+      children: [
+        for (final section in _SettingsSection.values)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => onSelected(section),
+                borderRadius: BorderRadius.circular(8),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 120),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color:
+                        section == selected
+                            ? AppColors.accentSoft
+                            : Colors.transparent,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color:
+                          section == selected
+                              ? AppColors.accent.withValues(alpha: 0.55)
+                              : Colors.transparent,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        iconFor(section),
+                        size: 16,
+                        color:
+                            section == selected
+                                ? AppColors.accent
+                                : AppColors.textFaint,
+                      ),
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: Text(
+                          labelFor(section),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight:
+                                section == selected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                            color:
+                                section == selected
+                                    ? AppColors.text
+                                    : AppColors.textDim,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _SectionChips extends StatelessWidget {
+  const _SectionChips({
+    required this.selected,
+    required this.labelFor,
+    required this.iconFor,
+    required this.onSelected,
+  });
+
+  final _SettingsSection selected;
+  final String Function(_SettingsSection section) labelFor;
+  final IconData Function(_SettingsSection section) iconFor;
+  final ValueChanged<_SettingsSection> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 50,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+        itemCount: _SettingsSection.values.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 6),
+        itemBuilder: (context, index) {
+          final section = _SettingsSection.values[index];
+          final active = section == selected;
+          return InkWell(
+            onTap: () => onSelected(section),
+            borderRadius: BorderRadius.circular(8),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 120),
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+              decoration: BoxDecoration(
+                color: active ? AppColors.accentSoft : AppColors.surface,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color:
+                      active
+                          ? AppColors.accent.withValues(alpha: 0.75)
+                          : AppColors.border,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    iconFor(section),
+                    size: 14,
+                    color: active ? AppColors.accent : AppColors.textFaint,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    labelFor(section),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                      color: active ? AppColors.text : AppColors.textDim,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ConnectionPanel extends StatelessWidget {
+  const _ConnectionPanel({
+    required this.controller,
+    required this.settings,
+    required this.clientName,
+    required this.clientFocus,
+    required this.onSaveClientName,
+  });
+
+  final RemoteController controller;
+  final AppSettings settings;
+  final TextEditingController clientName;
+  final FocusNode clientFocus;
+  final VoidCallback onSaveClientName;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SettingsCard(
+          title: l10n.t('connectionSection'),
+          icon: Icons.lan_outlined,
+          children: [
+            TextField(
+              controller: clientName,
+              focusNode: clientFocus,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => onSaveClientName(),
+              decoration: InputDecoration(
+                labelText: l10n.t('clientName'),
+                helperText: l10n.t('clientNameHint'),
+                prefixIcon: const Icon(Icons.phone_android_rounded, size: 18),
+                suffixIcon: IconButton(
+                  tooltip: l10n.t('done'),
+                  icon: const Icon(Icons.check_rounded, size: 18),
+                  onPressed: () {
+                    onSaveClientName();
+                    clientFocus.unfocus();
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            _SwitchRow(
+              title: l10n.t('autoReconnect'),
+              subtitle: l10n.t('autoReconnectHint'),
+              value: settings.autoReconnect,
+              onChanged: (value) => controller.setAutoReconnect(value),
+            ),
+            const Divider(height: 24),
+            _ConnectionDetails(controller: controller),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _InterfacePanel extends StatelessWidget {
+  const _InterfacePanel({
+    required this.settings,
+    required this.onLanguageChanged,
+  });
+
+  final AppSettings settings;
+  final ValueChanged<AppLanguage> onLanguageChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SettingsCard(
+          title: l10n.t('languageSection'),
+          icon: Icons.translate_rounded,
+          children: [
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final language in AppLanguage.values)
+                  _LanguageChip(
+                    language: language,
+                    selected: settings.language == language,
+                    onTap: () => onLanguageChanged(language),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              l10n.t('interfaceBody'),
+              style: const TextStyle(
+                fontSize: 11,
+                height: 1.45,
+                color: AppColors.textFaint,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        _SettingsCard(
+          title: l10n.t('interfaceSection'),
+          icon: Icons.palette_outlined,
+          children: [
+            Text(
+              l10n.t('interfaceStudioNote'),
+              style: const TextStyle(
+                fontSize: 11.5,
+                height: 1.5,
+                color: AppColors.textDim,
+              ),
+            ),
+            const SizedBox(height: 12),
+            StatusPill(
+              label: l10n.t('studio'),
+              color: AppColors.accent,
+              icon: Icons.computer_rounded,
+              dense: true,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _SecurityPanel extends StatelessWidget {
+  const _SecurityPanel({required this.onDisconnect, required this.onForget});
+
+  final VoidCallback onDisconnect;
+  final VoidCallback onForget;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return _SettingsCard(
+      title: l10n.t('securitySection'),
+      icon: Icons.shield_outlined,
+      children: [
+        Text(
+          l10n.t('securityBody'),
+          style: const TextStyle(
+            fontSize: 11.5,
+            height: 1.5,
+            color: AppColors.textDim,
+          ),
+        ),
+        const SizedBox(height: 10),
+        StatusPill(
+          label: l10n.t('securityWarning'),
+          color: AppColors.warning,
+          icon: Icons.lan_outlined,
+          dense: true,
+        ),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: onDisconnect,
+                icon: const Icon(Icons.link_off_rounded, size: 17),
+                label: Text(l10n.t('disconnect')),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.danger,
+                  side: BorderSide(
+                    color: AppColors.danger.withValues(alpha: 0.5),
+                  ),
+                ),
+                onPressed: onForget,
+                icon: const Icon(Icons.delete_outline_rounded, size: 17),
+                label: Text(l10n.t('forgetPairing')),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _AboutPanel extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return _SettingsCard(
+      title: l10n.t('aboutSection'),
+      icon: Icons.info_outline_rounded,
+      children: [
+        Row(
+          children: [
+            const BrandMark(size: 46),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  l10n.t('appName'),
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.text,
+                  ),
+                ),
+                Text(
+                  l10n.t('appVersion', {'version': kAppVersion}),
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    color: AppColors.textFaint,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Text(
+          l10n.t('aboutBody'),
+          style: const TextStyle(
+            fontSize: 11.5,
+            height: 1.5,
+            color: AppColors.textDim,
+          ),
+        ),
+        const Divider(height: 24),
+        InfoRow(
+          label: l10n.t('protocolVersion', {'version': ''}).trim(),
+          value: '$kRemoteProtocolVersion',
+          icon: Icons.api_rounded,
+        ),
+        InfoRow(
+          label: l10n.t('madeBy'),
+          value: 'EZMusicProduction',
+          icon: Icons.favorite_outline_rounded,
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed:
+              () => showLicensePage(
+                context: context,
+                applicationName: l10n.t('appName'),
+                applicationVersion: kAppVersion,
+              ),
+          icon: const Icon(Icons.description_outlined, size: 17),
+          label: Text(l10n.t('licences')),
+        ),
+      ],
     );
   }
 }
@@ -383,8 +710,8 @@ class _SwitchRow extends StatelessWidget {
   }
 }
 
-class _LanguageTile extends StatelessWidget {
-  const _LanguageTile({
+class _LanguageChip extends StatelessWidget {
+  const _LanguageChip({
     required this.language,
     required this.selected,
     required this.onTap,
@@ -403,72 +730,34 @@ class _LanguageTile extends StatelessWidget {
       AppLanguage.spanish => l10n.t('spanish'),
       AppLanguage.japanese => l10n.t('japanese'),
     };
-    final subtitle =
-        language == AppLanguage.system
-            ? l10n.t('systemDefault')
-            : languageCode(language);
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(9),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+      borderRadius: BorderRadius.circular(7),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.accent : AppColors.surface,
+          borderRadius: BorderRadius.circular(7),
+          border: Border.all(
+            color: selected ? AppColors.accent : AppColors.border,
+          ),
+        ),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 30,
-              height: 22,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppColors.panelAlt,
-                borderRadius: BorderRadius.circular(5),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Text(
-                languageCode(language).toUpperCase(),
-                style: const TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textDim,
-                  letterSpacing: 0.5,
-                ),
+            if (selected) ...[
+              const Icon(Icons.check_rounded, size: 14, color: Colors.black),
+              const SizedBox(width: 5),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: selected ? Colors.black : AppColors.textDim,
               ),
             ),
-            const SizedBox(width: 11),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w600,
-                      color: selected ? AppColors.text : AppColors.textDim,
-                    ),
-                  ),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      fontSize: 9.5,
-                      color: AppColors.textFaint,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (selected)
-              const Icon(
-                Icons.check_circle_rounded,
-                size: 18,
-                color: AppColors.accent,
-              )
-            else
-              Icon(
-                Icons.circle_outlined,
-                size: 18,
-                color: AppColors.borderStrong.withValues(alpha: 0.8),
-              ),
           ],
         ),
       ),

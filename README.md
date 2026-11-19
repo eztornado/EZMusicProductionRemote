@@ -16,13 +16,18 @@ does not require a backend, a cloud account or a plugin in the desktop project.
 - **Mixer** — channel strips with faders, pan, mute/solo/record-arm, peak meters
   and a master strip. Continuous fader and pan drags become one undo entry when
   released.
+- **Synth** — dedicated instrument surface with EZSynth 2 factory presets,
+  grouped page tabs (layers, filters, envelopes, modulation, FX, arp, macros
+  and expression) and switch/choice/integer-aware controls.
 - **FX** — insert chains per track, instrument parameters, bypass, add/remove,
-  master chain management and a throttled parameter editor.
+  master chain management with parameter editing and a throttled editor.
 - **Automation** — volume, pan and sustain lanes plus plugin-parameter lanes;
   add points by tapping, shape them by dragging, delete with a long press, and
   write volume at the playhead.
 - **Project** — undo/redo, track creation/removal, rename, colour and input
   channel.
+- **Settings** — desktop-style sectioned preferences: connection, interface
+  (language), security and about.
 - **Live state** — project, transport and 20 Hz meters are pushed by the DAW.
 - **Adaptive UI** — bottom navigation on phones, a navigation rail on tablets,
   and side-by-side FX editing on wide screens.

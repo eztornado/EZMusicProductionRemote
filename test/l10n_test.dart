@@ -28,6 +28,20 @@ void main() {
     expect(L10n.forLanguage(AppLanguage.japanese).t('mixerTitle'), 'ミキサー');
   });
 
+  test('ships the synth and settings sections in every language', () {
+    final en = L10n.forLanguage(AppLanguage.english);
+    final es = L10n.forLanguage(AppLanguage.spanish);
+    final ja = L10n.forLanguage(AppLanguage.japanese);
+    expect(en.t('navigationSynth'), 'Synth');
+    expect(es.t('navigationSynth'), 'Synth');
+    expect(ja.t('navigationSynth'), 'シンセ');
+    expect(en.t('interfaceSection'), 'Interface');
+    expect(es.t('interfaceSection'), 'Interfaz');
+    expect(ja.t('interfaceSection'), 'インターフェース');
+    expect(es.t('presetSection'), 'Presets');
+    expect(ja.t('presetSection'), 'プリセット');
+  });
+
   test('interpolates named placeholders', () {
     expect(
       L10n.forLanguage(AppLanguage.english).t('channelCount', {'count': 3}),

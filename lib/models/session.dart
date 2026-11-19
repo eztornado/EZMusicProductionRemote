@@ -335,6 +335,12 @@ class FxParam {
     required this.name,
     required this.value,
     required this.text,
+    this.id = '',
+    this.group = '',
+    this.flags = 0,
+    this.defaultValue = 0,
+    this.steps = 0,
+    this.choices = const <String>[],
   });
 
   factory FxParam.fromJson(Map<String, Object?> json) {
@@ -343,6 +349,14 @@ class FxParam {
       name: jsonString(json['name'], 'Parameter'),
       value: clampDouble(jsonDouble(json['value']), 0, 1),
       text: jsonString(json['text']),
+      id: jsonString(json['id']),
+      group: jsonString(json['group']),
+      flags: jsonInt(json['flags']),
+      defaultValue: clampDouble(jsonDouble(json['default']), 0, 1),
+      steps: jsonInt(json['steps']),
+      choices: jsonList(
+        json['choices'],
+      ).map((item) => jsonString(item)).toList(growable: false),
     );
   }
 
@@ -351,13 +365,115 @@ class FxParam {
   final double value; // normalized 0..1
   final String text;
 
+  /// Stable identifier exposed by EZSynth and other built-in devices.
+  final String id;
+
+  /// UI grouping hint (`global`, `a`, `b`, `filter`, `env`, `fx`, …).
+  final String group;
+
+  /// Bit 1 = boolean, bit 2 = choice, bit 4 = integer.
+  final int flags;
+  final double defaultValue;
+  final int steps;
+  final List<String> choices;
+
+  bool get isBoolean => (flags & 1) != 0;
+  bool get isChoice => (flags & 2) != 0;
+  bool get isInteger => (flags & 4) != 0;
+  bool get isContinuous => !isBoolean && !isChoice && !isInteger;
+  bool get isToggled => value >= 0.5;
+
+  int get choiceIndex {
+    if (steps <= 1) return 0;
+    return (value * (steps - 1)).round().clamp(0, steps - 1);
+  }
+
+  double valueForChoice(int index) {
+    if (steps <= 1) return 0;
+    return (index / (steps - 1)).clamp(0.0, 1.0).toDouble();
+  }
+
+  String get choiceText =>
+      text.isNotEmpty ? text : (choices.isNotEmpty ? choices[choiceIndex] : '');
+
   FxParam copyWith({double? value, String? text}) {
     return FxParam(
       index: index,
       name: name,
       value: value ?? this.value,
       text: text ?? this.text,
+      id: id,
+      group: group,
+      flags: flags,
+      defaultValue: defaultValue,
+      steps: steps,
+      choices: choices,
     );
+  }
+}
+
+/// One preset exposed by a plug-in's program bank (EZSynth 2 publishes its
+/// factory bank here).
+class FxProgram {
+  const FxProgram({required this.index, required this.name});
+
+  factory FxProgram.fromJson(Object? raw, int index) {
+    if (raw is String) return FxProgram(index: index, name: raw);
+    return FxProgram(
+      index: index,
+      name: jsonString(jsonMap(raw)['name'], 'Preset ${index + 1}'),
+    );
+  }
+
+  final int index;
+  final String name;
+
+  String get shortName {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return 'Preset ${index + 1}';
+    final split = trimmed.indexOf('|');
+    return split < 0 ? trimmed : trimmed.substring(split + 1).trim();
+  }
+}
+
+/// Complete `fx.params` reply: parameters plus the optional program bank.
+class FxSlotSnapshot {
+  const FxSlotSnapshot({
+    required this.slotKind,
+    required this.slotIndex,
+    required this.params,
+    this.programs = const <FxProgram>[],
+    this.currentProgram = 0,
+  });
+
+  factory FxSlotSnapshot.fromJson(Map<String, Object?> json) {
+    final programs = <FxProgram>[];
+    final rawPrograms = jsonList(json['programs']);
+    for (var i = 0; i < rawPrograms.length; i++) {
+      programs.add(FxProgram.fromJson(rawPrograms[i], i));
+    }
+    return FxSlotSnapshot(
+      slotKind: jsonInt(json['slotKind']),
+      slotIndex: jsonInt(json['slotIndex']),
+      params: jsonList(
+        json['params'],
+      ).map((item) => FxParam.fromJson(jsonMap(item))).toList(growable: false),
+      programs: programs,
+      currentProgram: jsonInt(json['currentProgram']),
+    );
+  }
+
+  final int slotKind;
+  final int slotIndex;
+  final List<FxParam> params;
+  final List<FxProgram> programs;
+  final int currentProgram;
+
+  bool get hasPrograms => programs.isNotEmpty;
+  FxProgram? get activeProgram {
+    if (programs.isEmpty) return null;
+    final index = currentProgram.clamp(0, programs.length - 1);
+    return programs[index];
   }
 }
 

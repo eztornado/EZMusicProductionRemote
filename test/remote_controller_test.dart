@@ -275,6 +275,54 @@ void main() {
     controller.dispose();
   });
 
+  test(
+    'plugin metadata and programs round-trip through the controller',
+    () async {
+      final api = _FakeRemoteApi();
+      final controller = RemoteController(
+        apiFactory: () => api,
+        settingsStore: _MemorySettingsStore(),
+        settings: const AppSettings(),
+      );
+      await controller.pair(host: 'studio.local', port: 47823, token: '123456');
+
+      final snapshot = await controller.fetchFxSlot(
+        trackId: 2,
+        slotKind: 1,
+        slotIndex: 0,
+      );
+      expect(snapshot.params, hasLength(3));
+      expect(snapshot.params[0].group, 'f1');
+      expect(snapshot.params[1].isChoice, isTrue);
+      expect(snapshot.params[1].choices[1], 'Square');
+      expect(snapshot.params[2].isBoolean, isTrue);
+      expect(snapshot.params[2].isToggled, isTrue);
+      expect(snapshot.hasPrograms, isTrue);
+      expect(snapshot.activeProgram?.shortName, 'Sub Bass');
+
+      final program = await controller.setFxProgram(
+        trackId: 2,
+        slotKind: 1,
+        slotIndex: 0,
+        programIndex: 1,
+      );
+      expect(program?.name, 'Bass | Sub Bass');
+      expect(
+        api.requests.where((request) => request.$1 == 'fx.setProgram'),
+        hasLength(1),
+      );
+
+      final master = await controller.fetchFxSlot(
+        trackId: 0,
+        slotKind: 2,
+        slotIndex: 0,
+      );
+      expect(master.slotKind, 2);
+      expect(master.params, isNotEmpty);
+      controller.dispose();
+    },
+  );
+
   test('meter events are smoothed into the public snapshot', () async {
     final api = _FakeRemoteApi();
     final controller = RemoteController(
@@ -322,7 +370,7 @@ void main() {
     controller.dispose();
   });
 
-  testWidgets('the workspace renders all four destinations', (tester) async {
+  testWidgets('the workspace renders all five destinations', (tester) async {
     tester.view.physicalSize = const Size(800, 1200);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -346,6 +394,10 @@ void main() {
     await tester.tap(find.text('Mixer'));
     await tester.pumpAndSettle();
     expect(find.text('Drums'), findsWidgets);
+
+    await tester.tap(find.text('Synth'));
+    await tester.pumpAndSettle();
+    expect(find.text('Instrument'), findsWidgets);
 
     await tester.tap(find.text('Effects'));
     await tester.pumpAndSettle();
@@ -378,7 +430,12 @@ void main() {
     expect(find.text('Test Session'), findsOneWidget);
     expect(tester.takeException(), isNull, reason: 'rendering Timeline');
 
-    for (final destination in <String>['Mixer', 'Effects', 'Automation']) {
+    for (final destination in <String>[
+      'Mixer',
+      'Synth',
+      'Effects',
+      'Automation',
+    ]) {
       await tester.tap(find.text(destination).first);
       await tester.pumpAndSettle();
       expect(find.text(destination), findsWidgets);
@@ -515,7 +572,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull, reason: 'rendering Timeline');
 
-    for (final destination in <String>['Mixer', 'Effects', 'Automation']) {
+    for (final destination in <String>[
+      'Mixer',
+      'Synth',
+      'Effects',
+      'Automation',
+    ]) {
       await tester.tap(find.text(destination).first);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull, reason: 'rendering $destination');
@@ -546,7 +608,12 @@ void main() {
     expect(find.byType(NavigationRail), findsOneWidget);
     expect(tester.takeException(), isNull, reason: 'rendering Timeline');
 
-    for (final destination in <String>['Mixer', 'Effects', 'Automation']) {
+    for (final destination in <String>[
+      'Mixer',
+      'Synth',
+      'Effects',
+      'Automation',
+    ]) {
       await tester.tap(find.text(destination).first);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull, reason: 'rendering $destination');
@@ -671,6 +738,54 @@ class _FakeRemoteApi implements RemoteApi {
           'trackId': fields['trackId'],
           'revision': ++_revision,
         };
+      case 'fx.params':
+        return <String, Object?>{
+          'slotKind': fields['slotKind'] ?? 0,
+          'slotIndex': fields['slotIndex'] ?? 0,
+          'params': <Object?>[
+            <String, Object?>{
+              'index': 0,
+              'id': 'f1_cutoff',
+              'name': 'Cutoff',
+              'value': 0.4,
+              'text': '40%',
+              'group': 'f1',
+              'flags': 0,
+              'default': 0.5,
+              'steps': 0,
+            },
+            <String, Object?>{
+              'index': 1,
+              'id': 'a_wave',
+              'name': 'Wave',
+              'value': 0.0,
+              'text': 'Saw',
+              'group': 'a',
+              'flags': 2,
+              'default': 0.0,
+              'steps': 4,
+              'choices': <String>['Saw', 'Square', 'Triangle', 'Sine'],
+            },
+            <String, Object?>{
+              'index': 2,
+              'id': 'l1_sync',
+              'name': 'LFO Sync',
+              'value': 1.0,
+              'text': 'On',
+              'group': 'l1',
+              'flags': 1,
+              'default': 0.0,
+              'steps': 2,
+            },
+          ],
+          'programs': <String>['Init | EZSynth Init', 'Bass | Sub Bass'],
+          'currentProgram': 1,
+        };
+      case 'fx.setProgram':
+        return <String, Object?>{
+          'program': fields['programIndex'],
+          'name': 'Bass | Sub Bass',
+        };
       case 'clip.move':
       case 'clip.split':
       case 'clip.remove':
@@ -731,6 +846,28 @@ class _FakeRemoteApi implements RemoteApi {
             'notes': <Object?>[],
           },
         ],
+      },
+      <String, Object?>{
+        'id': 2,
+        'type': 'instrument',
+        'name': 'Keys',
+        'colorIndex': 3,
+        'volume': 0.7,
+        'pan': 0.0,
+        'mute': false,
+        'solo': false,
+        'armed': false,
+        'inputChannel': 0,
+        'instrument': 'EZSynth 2',
+        'midiFx': '',
+        'fx': <Object?>[],
+        'automation': <String, Object?>{
+          'volume': <Object?>[],
+          'pan': <Object?>[],
+          'sustain': <Object?>[],
+          'params': <Object?>[],
+        },
+        'clips': <Object?>[],
       },
     ],
   };

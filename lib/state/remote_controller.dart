@@ -1091,6 +1091,21 @@ class RemoteController {
     required int slotKind,
     required int slotIndex,
   }) async {
+    final snapshot = await fetchFxSlot(
+      trackId: trackId,
+      slotKind: slotKind,
+      slotIndex: slotIndex,
+    );
+    return snapshot.params;
+  }
+
+  /// Full `fx.params` reply, including groups and the preset bank when the
+  /// studio exposes them. `slotKind: 2` addresses a master insert.
+  Future<FxSlotSnapshot> fetchFxSlot({
+    required int trackId,
+    required int slotKind,
+    required int slotIndex,
+  }) async {
     final result = jsonMap(
       await _request('fx.params', {
         'trackId': trackId,
@@ -1098,9 +1113,32 @@ class RemoteController {
         'slotIndex': slotIndex,
       }),
     );
-    return jsonList(
-      result['params'],
-    ).map((item) => FxParam.fromJson(jsonMap(item))).toList(growable: false);
+    return FxSlotSnapshot.fromJson(result);
+  }
+
+  Future<FxProgram?> setFxProgram({
+    required int trackId,
+    required int slotKind,
+    required int slotIndex,
+    required int programIndex,
+  }) async {
+    try {
+      final result = jsonMap(
+        await _request('fx.setProgram', {
+          'trackId': trackId,
+          'slotKind': slotKind,
+          'slotIndex': slotIndex,
+          'programIndex': programIndex,
+        }),
+      );
+      return FxProgram(
+        index: jsonInt(result['program'], programIndex),
+        name: jsonString(result['name']),
+      );
+    } on Object catch (raw) {
+      _report(raw);
+      return null;
+    }
   }
 
   Future<FxParam?> setFxParam({

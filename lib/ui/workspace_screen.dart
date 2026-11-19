@@ -11,6 +11,7 @@ import 'automation_screen.dart';
 import 'fx_screen.dart';
 import 'mixer_screen.dart';
 import 'settings_sheet.dart';
+import 'synth_screen.dart';
 import 'timeline_screen.dart';
 
 class WorkspaceScreen extends StatefulWidget {
@@ -36,12 +37,12 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
 
   void _openFx([int? trackId]) {
     if (trackId != null) _controller.selectTrack(trackId);
-    setState(() => _index = 2);
+    setState(() => _index = 3);
   }
 
   void _openAutomation([int? trackId]) {
     if (trackId != null) _controller.selectTrack(trackId, clearClip: false);
-    setState(() => _index = 3);
+    setState(() => _index = 4);
   }
 
   void _openSettings() {
@@ -82,6 +83,11 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                         icon: const Icon(Icons.equalizer_outlined),
                         selectedIcon: const Icon(Icons.equalizer_rounded),
                         label: l10n.t('navigationMixer'),
+                      ),
+                      NavigationDestination(
+                        icon: const Icon(Icons.piano_outlined),
+                        selectedIcon: const Icon(Icons.piano_rounded),
+                        label: l10n.t('navigationSynth'),
                       ),
                       NavigationDestination(
                         icon: const Icon(Icons.tune_outlined),
@@ -136,10 +142,14 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                           ),
                           TickerMode(
                             enabled: _index == 2,
-                            child: FxScreen(controller: _controller),
+                            child: SynthScreen(controller: _controller),
                           ),
                           TickerMode(
                             enabled: _index == 3,
+                            child: FxScreen(controller: _controller),
+                          ),
+                          TickerMode(
+                            enabled: _index == 4,
                             child: AutomationScreen(controller: _controller),
                           ),
                         ],
@@ -336,6 +346,7 @@ class _Rail extends StatelessWidget {
         Icons.equalizer_rounded,
         l10n.t('navigationMixer'),
       ),
+      (Icons.piano_outlined, Icons.piano_rounded, l10n.t('navigationSynth')),
       (Icons.tune_outlined, Icons.tune_rounded, l10n.t('navigationEffects')),
       (
         Icons.show_chart_rounded,

@@ -157,6 +157,81 @@ void main() {
     expect(snapshot.masterLeft.hold, 0);
   });
 
+  group('FxSlotSnapshot', () {
+    final snapshot = FxSlotSnapshot.fromJson({
+      'slotKind': 1,
+      'slotIndex': 0,
+      'currentProgram': 1,
+      'programs': <Object?>['Init | EZSynth Init', 'Bass | Sub Bass'],
+      'params': <Object?>[
+        {
+          'index': 0,
+          'id': 'cutoff',
+          'name': 'Cutoff',
+          'value': 0.4,
+          'text': '40%',
+          'group': 'f1',
+          'flags': 0,
+          'default': 0.5,
+          'steps': 0,
+        },
+        {
+          'index': 1,
+          'id': 'wave',
+          'name': 'Wave',
+          'value': 0.0,
+          'text': 'Saw',
+          'group': 'a',
+          'flags': 2,
+          'default': 0.0,
+          'steps': 4,
+          'choices': <Object?>['Saw', 'Square', 'Triangle', 'Sine'],
+        },
+        {
+          'index': 2,
+          'id': 'sync',
+          'name': 'Sync',
+          'value': 1.0,
+          'text': 'On',
+          'group': 'l1',
+          'flags': 1,
+          'default': 0.0,
+          'steps': 2,
+        },
+      ],
+    });
+
+    test('parses metadata, choices and programs', () {
+      expect(snapshot.slotKind, 1);
+      expect(snapshot.params, hasLength(3));
+      expect(snapshot.params.first.id, 'cutoff');
+      expect(snapshot.params.first.group, 'f1');
+      expect(snapshot.params.first.isContinuous, isTrue);
+      expect(snapshot.params[1].isChoice, isTrue);
+      expect(snapshot.params[1].choiceIndex, 0);
+      expect(snapshot.params[1].choiceText, 'Saw');
+      expect(snapshot.params[1].valueForChoice(1), closeTo(1 / 3, 1e-9));
+      expect(snapshot.params[2].isBoolean, isTrue);
+      expect(snapshot.params[2].isToggled, isTrue);
+      expect(snapshot.hasPrograms, isTrue);
+      expect(snapshot.activeProgram?.shortName, 'Sub Bass');
+    });
+
+    test('tolerates replies without the new fields', () {
+      final legacy = FxSlotSnapshot.fromJson({
+        'slotKind': 0,
+        'slotIndex': 0,
+        'params': <Object?>[
+          {'index': 0, 'name': 'Mix', 'value': 0.5, 'text': '50%'},
+        ],
+      });
+      expect(legacy.params.single.group, isEmpty);
+      expect(legacy.params.single.isContinuous, isTrue);
+      expect(legacy.programs, isEmpty);
+      expect(legacy.activeProgram, isNull);
+    });
+  });
+
   group('format helpers', () {
     test('formats gain, pan and clock values', () {
       expect(formatDb(1), '0.0 dB');

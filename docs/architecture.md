@@ -136,11 +136,21 @@ stop retrying and return to the connection screen.
 
 - `ConnectScreen` when no session is open.
 - `WorkspaceScreen` when connected, with an `IndexedStack` of Timeline, Mixer,
-  FX and Automation.
+  Synth, FX and Automation (indices 0–4). Timeline and Mixer can jump straight
+  to FX (3) or Automation (4) for the selected track.
 
 `WorkspaceScreen` chooses a bottom navigation bar below 820 px and a navigation
 rail above it. Each destination is kept alive by the `IndexedStack`, which
 preserves scroll offsets and selection while switching tabs.
+
+The Synth screen targets the selected instrument with `slotKind: 1`. It reuses
+`FxParameterView`, so any instrument that publishes `fx.params` groups gets
+page tabs, presets and typed controls; EZSynth 2 additionally shows its badge.
+The FX screen and master-effects sheet use the same widget, with master inserts
+addressed as `slotKind: 2`, `trackId: 0`.
+
+The settings sheet mirrors the desktop preferences window: a section rail on
+wide layouts and horizontal section chips on phones.
 
 Shared widgets in `lib/widgets/` keep the visual language consistent:
 
@@ -148,6 +158,8 @@ Shared widgets in `lib/widgets/` keep the visual language consistent:
 - `PeakMeter` — track and stereo master meters.
 - `TransportBar` — global transport controls.
 - `TrackChips` — compact track selector.
+- `FxParameterView` — shared parameter editor with search, presets, page tabs,
+  grouped sections and typed sliders/switches/choices.
 - `ColorPalette` — the 16-colour DAW palette.
 - `SheetHeader`, `EmptyState`, `ToggleTag`, `CountBadge`, `AppIconButton`,
   `showAppSheet`, `showConfirmDialog` — consistent sheets and dialogs.
