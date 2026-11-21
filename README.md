@@ -87,6 +87,14 @@ Debug builds work without any signing setup:
 flutter build apk --debug
 ```
 
+### Build from GitHub Actions
+
+The CI workflow builds a debug APK on every push to `main` and on pull
+requests. To build one on demand, open **Actions → CI → Run workflow**. Once the
+run finishes, download **`ezmusicproductionremote-debug-apk`** from the run's
+**Artifacts** section. The APK is debug-signed and installable on test devices;
+use a tag release for a release-signed APK.
+
 ### Release signing
 
 Release builds must use your own private key. The project deliberately has **no
