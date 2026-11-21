@@ -1,8 +1,8 @@
 # EZMusicProductionRemote
 
-A native Flutter Android remote for **EZMusicProduction**. It turns an Android
-phone or tablet into a transport, timeline, mixer, FX and automation surface for
-a DAW running on the local network.
+A native Flutter remote for **EZMusicProduction**. It turns an Android phone or
+tablet — or an iPad — into a transport, timeline, mixer, FX and automation
+surface for a DAW running on the local network.
 
 The app is a standalone client for the DAW's WebSocket + JSON remote API. It
 does not require a backend, a cloud account or a plugin in the desktop project.
@@ -39,10 +39,11 @@ does not require a backend, a cloud account or a plugin in the desktop project.
 ## Requirements
 
 - Flutter 3.29 or newer with Dart 3.7 or newer.
-- Android 5.0 (API 21) or newer.
+- Android 5.0 (API 21) or newer, or iPadOS 12 or newer.
 - The DAW's remote server enabled in **Preferences → Remote control**.
 - The phone/tablet and the computer on the same trusted LAN.
 - For Android builds: the Android SDK and a JDK (17 recommended).
+- For iOS/iPad builds: macOS, Xcode 15 or newer and CocoaPods.
 
 ## Run the app
 
@@ -145,6 +146,49 @@ release-signed APKs from CI, add four repository secrets:
 `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD`. Without them the workflow
 falls back to a debug-signed APK, which is clearly labelled as such in the
 release notes.
+
+## Build iPad / iOS
+
+The project includes an iOS target that supports both iPhone and iPad. Building
+it requires macOS with Xcode 15 or newer and CocoaPods:
+
+```bash
+flutter pub get
+cd ios && pod install && cd ..
+flutter build ipa --release
+```
+
+Running on a physical iPad requires an Apple development team for signing. A
+free Apple ID works for local development but the app expires after seven days;
+TestFlight and App Store distribution require the Apple Developer Program.
+
+The app uses the local network to find and control the DAW. On iOS/iPadOS the
+system asks for local network permission on first use; the required usage
+description and local-networking ATS exception are already configured in
+`ios/Runner/Info.plist`.
+
+### iOS / iPad from GitHub Actions
+
+The `iOS / iPad` workflow runs on new tags and can be started manually from
+**Actions → iOS / iPad → Run workflow**. It always publishes an unsigned
+`Runner.app` archive so the iOS target is compile-checked.
+
+If these repository secrets are configured, the workflow also builds and
+uploads a signed IPA:
+
+- `IOS_CERTIFICATE_BASE64` — base64 of the `.p12` signing certificate.
+- `IOS_CERTIFICATE_PASSWORD` — password for the `.p12`.
+- `IOS_PROVISIONING_PROFILE_BASE64` — base64 of the matching `.mobileprovision`.
+- `APPLE_TEAM_ID` — Apple Developer team identifier.
+
+The optional `IOS_EXPORT_METHOD` repository variable selects the export method
+when the workflow is triggered by a tag: `development`, `ad-hoc`, `app-store` or
+`enterprise`. Manual runs can choose it in the workflow form. The provisioning
+profile must match the bundle identifier
+`com.ezmusicproduction.ezmusicproductionRemote` and the signing certificate.
+
+Without the signing secrets, the unsigned artifact verifies the build but
+cannot be installed on an iPad.
 
 ## Security notes
 
