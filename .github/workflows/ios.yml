@@ -29,7 +29,7 @@ jobs:
       IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
       IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      EXPORT_METHOD: ${{ inputs.export_method || vars.IOS_EXPORT_METHOD || 'development' }}
+      EXPORT_METHOD: ${{ github.event.inputs.export_method || vars.IOS_EXPORT_METHOD || 'development' }}
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
